@@ -1,0 +1,337 @@
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.util.*;
+import javax.swing.*;
+
+public class Console implements ActionListener {
+
+    private static final String ROOMS_FILE = "Sem2_t1/rooms.txt";
+    private static final HashMap<Integer, Room> rooms = new HashMap<>();
+    private JFrame frame;
+    private JTextField typeField, priceField, balconyField, loungeField, emailField, passwordField;
+    private JTextArea resultArea;
+    private JList<String> roomList;
+
+    public Console() {
+        frame = new JFrame("Hotel Booking System");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new GridLayout(9, 2));
+
+        addLabelAndField(mainPanel, "Type [Single|Double|Suite] :", typeField = new JTextField());
+        addLabelAndField(mainPanel, "Max Price :", priceField = new JTextField());
+        addLabelAndField(mainPanel, "Balcony [Y|N] :", balconyField = new JTextField());
+        addLabelAndField(mainPanel, "Lounge [Y|N] :", loungeField = new JTextField());
+        addLabelAndField(mainPanel, "Email/Room No :", emailField = new JTextField());
+        addLabelAndField(mainPanel, "Password :", passwordField = new JTextField());
+
+        JButton reserveButton = new JButton("Reserve Any Room");
+        JButton searchButton = new JButton("Search & Reserve Room");
+        JButton cancelButton = new JButton("Cancel Room");
+        JButton displayRoomsButton = new JButton("Display Rooms");
+        displayRoomsButton.addActionListener(this);
+        mainPanel.add(displayRoomsButton);
+
+        JButton todoButton = new JButton("ToDo");
+        JButton quitButton = new JButton("Quit");
+
+        reserveButton.addActionListener(this);
+        searchButton.addActionListener(this);
+        cancelButton.addActionListener(this);
+        displayRoomsButton.addActionListener(this);
+        todoButton.addActionListener(this);
+        quitButton.addActionListener(this);
+
+        mainPanel.add(reserveButton);
+        mainPanel.add(searchButton);
+        mainPanel.add(cancelButton);
+        mainPanel.add(displayRoomsButton);
+        mainPanel.add(todoButton);
+        mainPanel.add(quitButton);
+
+        roomList = new JList<>();
+        JScrollPane listScrollPane = new JScrollPane(roomList);
+
+        resultArea = new JTextArea();
+        JScrollPane textScrollPane = new JScrollPane(resultArea);
+
+        frame.add(mainPanel, BorderLayout.NORTH);
+        frame.add(listScrollPane, BorderLayout.WEST);
+        frame.add(textScrollPane, BorderLayout.CENTER);
+
+        // Display available rooms when the application starts
+        updateRoomList();
+        loadData();
+
+        frame.pack();
+        frame.setVisible(true);
+    }
+
+    private void addLabelAndField(JPanel panel, String labelText, JTextField textField) {
+        panel.add(new JLabel(labelText));
+        panel.add(textField);
+    }
+
+    private void displayAvailableRooms() {
+        System.out.println("-- AVAILABLE ROOMS --");
+        for (Room room : rooms.values()) {
+            if (!room.isReserve()) {
+                System.out.println(room.toString());
+                appendResultArea(room.toString());
+            }
+        }
+    }
+
+    private void appendResultArea(String text) {
+        resultArea.append(text + "\n");
+    }
+
+    private void displayAllRooms() {
+        resultArea.setText(""); // Clear existing content
+        try (Scanner scanner = new Scanner(new FileReader(ROOMS_FILE))) {
+            while (scanner.hasNext()) {
+                String roomInfo = scanner.nextLine();
+                System.out.println(roomInfo);
+                appendResultArea(roomInfo);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(frame, "Error loading data from file: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void updateRoomList() {
+        DefaultListModel<String> listModel = new DefaultListModel<>();
+        for (Room room : rooms.values()) {
+            if (!room.isReserve()) {
+                listModel.addElement(room.toString());
+            }
+        }
+        roomList.setModel(listModel);
+    }
+    public void actionPerformed(ActionEvent e) {
+        String command = e.getActionCommand();
+        switch (command) {
+            case "Reserve Any Room":
+                reserveRoom();
+                break;
+            case "Search & Reserve Room":
+                searchRoom();
+                break;
+            case "Cancel Room":
+                cancelRoom();
+                break;
+            case "ToDo":
+                // Handle ToDo action
+                break;
+            case "Quit":
+                frame.dispose();
+                saveData();
+                System.out.println("Bye Bye :)");
+                break;
+        }
+    }
+
+    private void reserveRoom() {
+        System.out.println("-- AVAILABLE ROOMS --");
+
+        boolean areRooms = false;
+
+        for (Room room : rooms.values()) {
+            if (!room.isReserve()) {
+                System.out.println(room.toString());
+                areRooms = true;
+            }
+        }
+
+        if (areRooms) {
+            try {
+                System.out.print("Choose Room No to Reserve: ");
+                int no = Integer.parseInt(emailField.getText());
+
+                Room roomToReserve = rooms.get(no);
+
+                if (roomToReserve != null && !roomToReserve.isReserve()) {
+                    System.out.print("eMail : ");
+                    String eMail = emailField.getText();
+
+                    // Prompt user to set a 4-digit password during reservation
+                    System.out.print("Set a 4-digit Password for Reservation: ");
+                    String password = passwordField.getText();
+
+                    try {
+                        // Reserve room with the provided email and password
+                        roomToReserve.reserveRoom(eMail, password);
+
+                        System.out.println("Victory !");
+                    } catch (Exception e) {
+                        System.out.println(e.getMessage());
+                    }
+                } else {
+                    System.out.println("Invalid Room Number or Room is already reserved.");
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid Room Number. Please enter a valid room number.");
+            }
+        } else {
+            System.out.println("No Available Rooms !");
+        }
+    }
+
+
+    private void searchRoom() {
+        System.out.println("-- SEARCH ROOMS --");
+
+        boolean areRooms = false;
+
+        String type = typeField.getText().toUpperCase();
+        double price = Double.parseDouble(priceField.getText());
+        boolean balcony = balconyField.getText().toUpperCase().equals("Y");
+        boolean lounge = loungeField.getText().toUpperCase().equals("Y");
+
+        // only interested in 3 or more matching criterion
+        for (int match = 4; match >= 2; match--) {
+            areRooms = false;
+
+            System.out.println("Showing Rooms Matching " + match + " Requirements !");
+
+            for (Room room : rooms.values()) {
+                if (!room.isReserve()) {
+                    if (room.checkMatch(type, price, balcony, lounge) == match) {
+                        System.out.println(room.toString());
+                        areRooms = true;
+                    }
+                }
+            }
+
+            if (areRooms) {
+                break;
+            } else {
+                System.out.println("No Rooms Matching : " + match + " Requirements !");
+            }
+        }
+
+        acquireRoom(areRooms);
+    }
+
+    private void acquireRoom(boolean areRooms) {
+        if (areRooms) {
+            try {
+                System.out.print("Reserve Room No : ");
+                int no = Integer.parseInt(emailField.getText());
+
+                Room roomToReserve = rooms.get(no);
+
+                if (roomToReserve != null && !roomToReserve.isReserve()) {
+                    System.out.print("eMail : ");
+                    String eMail = emailField.getText();
+
+                    // Prompt user to set a 4-digit password during reservation
+                    System.out.print("Set a 4-digit Password for Reservation: ");
+                    String password = passwordField.getText();
+
+                    try {
+                        // Reserve room with the provided email and password
+                        roomToReserve.reserveRoom(eMail, password);
+
+                        System.out.println("Victory !");
+                    } catch (Exception e) {
+                        System.out.println(e.getMessage());
+                    }
+                } else {
+                    System.out.println("Invalid Room Number or Room is already reserved.");
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid Room Number. Please enter a valid room number.");
+            }
+        } else {
+            System.out.println("No Available Rooms !");
+        }
+    }
+
+
+    private void cancelRoom() {
+        System.out.print("eMail : ");
+        String eMail = emailField.getText();
+
+        System.out.println("-- " + eMail + " RESERVE ROOMS --");
+
+        boolean areRooms = false;
+
+        for (Room room : rooms.values()) {
+            if (room.isReserve()) {
+                if (eMail.equals(room.getMail())) {
+                    System.out.println(room.toString());
+                    areRooms = true;
+                }
+            }
+        }
+
+        if (areRooms) {
+            System.out.print("Cancel Room No : ");
+            int no = Integer.parseInt(emailField.getText());
+
+            Room roomToCancel = rooms.get(no);
+
+            if (roomToCancel != null && roomToCancel.isReserve()) {
+                System.out.print("Enter 4-digit Password for Cancellation: ");
+                String password = passwordField.getText();
+                // Check if the entered password matches the room's password
+                if (password.equals(roomToCancel.getPassword())) {
+
+                    try {
+                        // Cancel reservation only if the password is correct
+                        roomToCancel.cancelRoom(roomToCancel.getMail());
+
+                        System.out.println("Victory !");
+                    } catch (Exception e) {
+                        System.out.println(e.getMessage());
+                    }
+                } else {
+                    System.out.println("Incorrect Password. Cancellation failed.");
+                }
+            } else {
+                System.out.println("Invalid Room Number or Room is not reserved.");
+            }
+        }
+    }
+
+    private void saveData() {
+        try (PrintWriter pw = new PrintWriter(new FileWriter(ROOMS_FILE))) {
+            for (Room room : rooms.values()) {
+                pw.println(room.toSaveString());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void loadData() {
+        try (Scanner scanner = new Scanner(new FileReader(ROOMS_FILE))) {
+            while (scanner.hasNext()) {
+                String[] strs = scanner.nextLine().split(" ");
+                rooms.put(Integer.parseInt(strs[0]), new Room(
+                        Integer.parseInt(strs[0]),
+                        strs[1],
+                        Double.parseDouble(strs[2]),
+                        Boolean.parseBoolean(strs[3]),
+                        Boolean.parseBoolean(strs[4]),
+                        strs[5],
+                        strs[6]
+                ));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(frame, "Error loading data from file: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new Console());
+    }
+}
